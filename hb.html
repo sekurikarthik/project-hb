@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SRM Issue Reporting Portal</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+
+<!-- ROLE SELECTION -->
+<div id="roleScreen" class="min-h-screen flex items-center justify-center">
+  <div class="bg-white p-8 rounded shadow w-full max-w-md text-center">
+    <h1 class="text-2xl font-bold mb-6">Select Portal</h1>
+    <button onclick="goRole('student')" class="w-full bg-blue-600 text-white py-2 mb-3 rounded">🎓 Student</button>
+    <button onclick="goRole('professor')" class="w-full bg-green-600 text-white py-2 mb-3 rounded">👨‍🏫 Professor</button>
+    <button onclick="goRole('admin')" class="w-full bg-purple-600 text-white py-2 rounded">🏢 Head Office</button>
+  </div>
+</div>
+
+<!-- STUDENT LOGIN -->
+<div id="studentScreen" class="hidden min-h-screen flex items-center justify-center">
+  <form class="bg-white p-6 rounded shadow w-full max-w-md" onsubmit="studentLogin(event)">
+    <h2 class="text-xl font-bold mb-4">Student Login</h2>
+    <input id="sEmail" required placeholder="College Email (@srm.edu.in)" class="w-full border p-2 mb-2">
+    <input id="sPass" required type="password" placeholder="Password" class="w-full border p-2 mb-2">
+    <input id="sAdm" required placeholder="AP***********" class="w-full border p-2 mb-3">
+    <button class="w-full bg-blue-600 text-white py-2 rounded">Login</button>
+  </form>
+</div>
+
+<!-- STUDENT DASHBOARD -->
+<div id="studentDashboard" class="hidden p-6 relative">
+  <h2 class="text-2xl font-bold mb-4">Student Issue Reporting</h2>
+
+  <div class="bg-white p-4 rounded shadow mb-4">
+    <input id="issueTitle" placeholder="Issue Title" class="w-full border p-2 mb-2">
+    <textarea id="issueDesc" placeholder="Issue Description" class="w-full border p-2 mb-2"></textarea>
+    <button onclick="submitIssue()" class="bg-blue-600 text-white px-4 py-2 rounded">Submit Issue</button>
+  </div>
+
+  <h3 class="text-xl font-semibold mb-2">My Issues</h3>
+  <div id="studentIssues"></div>
+</div>
+
+<!-- PROFESSOR LOGIN -->
+<div id="professorScreen" class="hidden min-h-screen flex items-center justify-center">
+  <div class="bg-white p-6 rounded shadow w-full max-w-md">
+    <h2 class="text-xl font-bold mb-4">Professor Login</h2>
+    <input id="pEmail" placeholder="College Email" class="w-full border p-2 mb-2">
+    <input id="pPass" type="password" placeholder="Password" class="w-full border p-2 mb-2">
+    <input id="pId" placeholder="Professor ID" class="w-full border p-2 mb-3">
+    <button onclick="professorLogin()" class="w-full bg-green-600 text-white py-2 rounded">Login</button>
+    <button onclick="showProfessorSignup()" class="w-full bg-gray-600 text-white py-2 rounded mt-2">Signup as New Professor</button>
+  </div>
+</div>
+
+<!-- PROFESSOR SIGNUP -->
+<div id="professorSignupScreen" class="hidden min-h-screen flex items-center justify-center">
+  <div class="bg-white p-6 rounded shadow w-full max-w-md">
+    <h2 class="text-xl font-bold mb-4">Professor Signup</h2>
+    <input id="newProfEmail" placeholder="College Email" class="w-full border p-2 mb-2">
+    <input id="newProfPass" type="password" placeholder="Password" class="w-full border p-2 mb-2">
+    <input id="newProfId" placeholder="Faculty ID" class="w-full border p-2 mb-3">
+    <button onclick="signupProfessor()" class="w-full bg-green-600 text-white py-2 rounded">Submit Signup</button>
+  </div>
+</div>
+
+<!-- PROFESSOR DASHBOARD -->
+<div id="professorDashboard" class="hidden p-6 relative">
+  <h2 class="text-2xl font-bold mb-4">Student Issues</h2>
+  <div id="professorIssues"></div>
+</div>
+
+<!-- ADMIN LOGIN -->
+<div id="adminLoginScreen" class="hidden min-h-screen flex items-center justify-center">
+  <form class="bg-white p-6 rounded shadow w-full max-w-md" onsubmit="adminLogin(event)">
+    <h2 class="text-xl font-bold mb-4">Head Office Login</h2>
+    <input id="aEmail" required class="w-full border p-2 mb-2">
+    <input id="aPass" required type="password" class="w-full border p-2 mb-3">
+    <button class="w-full bg-purple-600 text-white py-2 rounded">Login</button>
+  </form>
+</div>
+
+<!-- ADMIN DASHBOARD -->
+<div id="adminDashboard" class="hidden p-6 relative">
+  <h2 class="text-2xl font-bold mb-4">Professor Approval & Issue Panel</h2>
+  <div id="requests"></div>
+</div>
+
+<script>
+const HEAD_OFFICE = { email:"srmhead@gmail.com", password:"srm123" };
+let professors = JSON.parse(localStorage.getItem("professors")) || [];
+let issues = JSON.parse(localStorage.getItem("issues")) || [];
+let messages = JSON.parse(localStorage.getItem("messages")) || [];
+let currentStudent = null;
+
+/* ---------- HELPERS ---------- */
+function hideAllScreens(){
+  roleScreen.classList.add("hidden");
+  studentScreen.classList.add("hidden");
+  studentDashboard.classList.add("hidden");
+  professorScreen.classList.add("hidden");
+  professorSignupScreen.classList.add("hidden");
+  professorDashboard.classList.add("hidden");
+  adminLoginScreen.classList.add("hidden");
+  adminDashboard.classList.add("hidden");
+}
+
+/* ---------- ROLE ---------- */
+function goRole(role){
+  hideAllScreens();
+  if(role==="student") studentScreen.classList.remove("hidden");
+  if(role==="professor") professorScreen.classList.remove("hidden");
+  if(role==="admin") adminLoginScreen.classList.remove("hidden");
+}
+
+/* ---------- STUDENT ---------- */
+function studentLogin(e){
+  e.preventDefault();
+  if(!sEmail.value.endsWith("@srm.edu.in")) return alert("Use SRM email");
+  if(!/^AP\d{10,}$/.test(sAdm.value)) return alert("Invalid Admission No");
+
+  currentStudent = { email:sEmail.value, adm:sAdm.value };
+  localStorage.setItem("currentUser", JSON.stringify({type:"student", email:sEmail.value, adm:sAdm.value}));
+  hideAllScreens();
+  studentDashboard.classList.remove("hidden");
+  renderStudentIssues();
+  addLogoutButton(studentDashboard);
+}
+
+function submitIssue(){
+  if(!issueTitle.value || !issueDesc.value) return alert("Fill all fields");
+
+  issues.push({
+    studentEmail: currentStudent.email,
+    admissionNo: currentStudent.adm,
+    title: issueTitle.value,
+    description: issueDesc.value,
+    status: "pending",
+    professorEmail: "",
+    studentMessage: ""
+  });
+
+  localStorage.setItem("issues", JSON.stringify(issues));
+  issueTitle.value = issueDesc.value = "";
+  renderStudentIssues();
+}
+
+function renderStudentIssues(){
+  const myIssues = issues.filter(i=>i.studentEmail===currentStudent.email);
+  studentIssues.innerHTML = myIssues.map((i, idx) => `
+    <div class="bg-white shadow-md rounded-xl p-4 border-l-4 ${i.status === "resolved" ? "border-green-500" : i.status==="completed" ? "border-gray-500" : "border-yellow-400"} mb-3">
+      <div class="flex justify-between items-center mb-2">
+        <h4 class="text-lg font-semibold text-gray-800">${i.title}</h4>
+        <span class="px-2 py-1 rounded-full text-sm font-medium ${i.status === "resolved" ? "bg-green-100 text-green-700" : i.status==="completed" ? "bg-gray-100 text-gray-700" : "bg-yellow-100 text-yellow-800"}">
+          ${i.status.toUpperCase()}
+        </span>
+      </div>
+      <p class="text-gray-700">${i.description}</p>
+      ${i.studentMessage ? `<div class="mt-2 p-2 bg-purple-100 rounded text-purple-700"><b>Message from Head Office:</b> ${i.studentMessage}</div>` : ""}
+      ${i.status==="resolved" && !i.completed ? `
+        <div class="mt-2">
+          <textarea id="feedback-${idx}" placeholder="Send feedback to Head Office" class="w-full border p-2 rounded mb-2"></textarea>
+          <button onclick="sendFeedback(${idx})" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition">Send Feedback</button>
+        </div>
+      ` : ""}
+    </div>
+  `).join("");
+}
+
+function sendFeedback(idx){
+  const feedback = document.getElementById(`feedback-${idx}`).value.trim();
+  if(!feedback) return alert("Enter feedback before sending");
+  
+  messages.push({ headEmail: HEAD_OFFICE.email, issueIndex: idx, studentFeedback: feedback, dismissed: false });
+  localStorage.setItem("messages", JSON.stringify(messages));
+  alert("Feedback sent to Head Office!");
+  document.getElementById(`feedback-${idx}`).value = "";
+}
+
+/* ---------- PROFESSOR ---------- */
+function professorLogin(){
+  const prof = professors.find(p =>
+    p.email===pEmail.value &&
+    p.password===pPass.value &&
+    p.status==="approved"
+  );
+  if(!prof) return alert("Not approved");
+
+  localStorage.setItem("currentUser", JSON.stringify({type:"professor", email:pEmail.value}));
+  hideAllScreens();
+  professorDashboard.classList.remove("hidden");
+  renderProfessorIssues();
+  addLogoutButton(professorDashboard);
+}
+
+function renderProfessorIssues(){
+  professorIssues.innerHTML = issues.map((i,idx)=>`
+    <div class="border p-3 mb-2 rounded">
+      <b>${i.title}</b> (${i.admissionNo})<br>
+      ${i.description}<br>
+      Status: <b>${i.status}</b>
+      ${i.status==="pending" ? 
+        `<button onclick="resolveIssue(${idx})"
+         class="ml-2 bg-green-600 text-white px-2 py-1 rounded">Resolve</button>` : ""}
+      ${messages.filter(m=>m.profEmail===i.professorEmail && m.issueIndex===idx).map(m=>`
+        <div class="mt-2 p-2 bg-blue-50 rounded text-blue-700"><b>Message from Head Office:</b> ${m.content}</div>
+      `).join("")}
+    </div>
+  `).join("");
+}
+
+function resolveIssue(i){
+  issues[i].status="resolved";
+  localStorage.setItem("issues", JSON.stringify(issues));
+  renderProfessorIssues();
+}
+
+/* ---------- PROFESSOR SIGNUP ---------- */
+function showProfessorSignup(){
+  hideAllScreens();
+  professorSignupScreen.classList.remove("hidden");
+}
+
+function signupProfessor(){
+  const email = newProfEmail.value.trim();
+  const pass = newProfPass.value.trim();
+  const id = newProfId.value.trim();
+  if(!email || !pass || !id) return alert("Fill all fields");
+  professors.push({ email, password: pass, facultyId: id, status: "pending" });
+  localStorage.setItem("professors", JSON.stringify(professors));
+  alert("Signup request submitted to Head Office!");
+  hideAllScreens();
+  professorScreen.classList.remove("hidden");
+}
+
+/* ---------- ADMIN ---------- */
+function adminLogin(e){
+  e.preventDefault();
+  if(aEmail.value===HEAD_OFFICE.email && aPass.value===HEAD_OFFICE.password){
+    localStorage.setItem("currentUser", JSON.stringify({type:"admin"}));
+    hideAllScreens();
+    adminDashboard.classList.remove("hidden");
+    renderRequests();
+    addLogoutButton(adminDashboard);
+  } else alert("Access Denied");
+}
+
+/* ---------- HEAD OFFICE DASHBOARD FUNCTIONS ---------- */
+function renderRequests(){
+    requests.innerHTML = "";
+
+    // Display professor signup requests
+    professors.forEach((p,i)=>{
+        const div = document.createElement("div");
+        div.className = "border p-3 mb-3 rounded bg-white shadow-sm flex justify-between items-center";
+        div.innerHTML = `<span>${p.email} - <b>${p.status}</b></span>`;
+        if(p.status==="pending"){
+            const approveBtn = document.createElement("button");
+            approveBtn.innerText = "Approve";
+            approveBtn.className = "ml-2 bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700";
+            approveBtn.onclick = ()=>{ professors[i].status="approved"; saveProf(); };
+
+            const rejectBtn = document.createElement("button");
+            rejectBtn.innerText = "Reject";
+            rejectBtn.className = "ml-2 bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700";
+            rejectBtn.onclick = ()=>{ professors.splice(i,1); saveProf(); };
+
+            div.appendChild(approveBtn);
+            div.appendChild(rejectBtn);
+        }
+        requests.appendChild(div);
+    });
+
+    // Display all student issues
+    issues.forEach((issue, idx)=>{
+        const div = document.createElement("div");
+        div.className = "border p-4 mb-3 rounded bg-gray-50 shadow-sm";
+
+        div.innerHTML = `
+            <b>${issue.title}</b> (${issue.admissionNo})<br>
+            ${issue.description}<br>
+            Status: <b>${issue.status}</b><br>
+            Assigned Professor: ${issue.professorEmail || "Not assigned"}<br><br>
+        `;
+
+        // Assign professor if pending
+        if(issue.status==="pending"){
+            const inputProf = document.createElement("input");
+            inputProf.placeholder = "Assign Professor Email";
+            inputProf.className = "border p-1 rounded w-full mb-1";
+            inputProf.id = `assign-${idx}`;
+
+            const inputMsg = document.createElement("textarea");
+            inputMsg.placeholder = "Message to Professor";
+            inputMsg.className = "border p-1 rounded w-full mb-1";
+            inputMsg.id = `msgProf-${idx}`;
+
+            const assignBtn = document.createElement("button");
+            assignBtn.innerText = "Assign & Message";
+            assignBtn.className = "bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700";
+            assignBtn.onclick = ()=>assignProfessor(idx);
+
+            div.appendChild(inputProf);
+            div.appendChild(inputMsg);
+            div.appendChild(assignBtn);
+        }
+
+        // Message student if resolved
+        if(issue.status==="resolved"){
+            const msgStudent = document.createElement("textarea");
+            msgStudent.placeholder = "Message to Student";
+            msgStudent.className = "border p-1 rounded w-full mb-1";
+            msgStudent.id = `msgStud-${idx}`;
+
+            const msgBtn = document.createElement("button");
+            msgBtn.innerText = "Message Student";
+            msgBtn.className = "bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700";
+            msgBtn.onclick = ()=>messageStudent(idx);
+
+            div.appendChild(msgStudent);
+            div.appendChild(msgBtn);
+        }
+
+        // Display student feedback
+        const feedbacks = messages.filter(m=>m.issueIndex===idx && m.studentFeedback && !m.dismissed);
+        feedbacks.forEach((f, fi)=>{
+            const fbDiv = document.createElement("div");
+            fbDiv.className = "mt-2 p-2 bg-blue-50 rounded";
+            fbDiv.innerHTML = `<b>Student Feedback:</b> ${f.studentFeedback} <button onclick="dismissIssue(${idx},${fi})" class="ml-2 bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded">Dismiss</button>`;
+            div.appendChild(fbDiv);
+        });
+
+        requests.appendChild(div);
+    });
+}
+
+function assignProfessor(idx){
+    const profEmail = document.getElementById(`assign-${idx}`).value.trim();
+    const msg = document.getElementById(`msgProf-${idx}`).value.trim();
+    if(!profEmail || !msg) return alert("Enter professor email and message");
+    issues[idx].professorEmail = profEmail;
+    messages.push({profEmail, issueIndex: idx, content: msg});
+    localStorage.setItem("issues", JSON.stringify(issues));
+    localStorage.setItem("messages", JSON.stringify(messages));
+    renderRequests();
+}
+
+function messageStudent(idx){
+    const msg = document.getElementById(`msgStud-${idx}`).value.trim();
+    if(!msg) return alert("Enter a message");
+    issues[idx].studentMessage = msg;
+    localStorage.setItem("issues", JSON.stringify(issues));
+    renderRequests();
+}
+
+function dismissIssue(idx, msgIndex){
+    if(!confirm("Dismiss this feedback and mark issue as completed?")) return;
+    let fb = messages.filter(m => m.issueIndex===idx && m.studentFeedback && !m.dismissed)[msgIndex];
+    fb.dismissed = true;
+    issues[idx].status = "completed";
+    localStorage.setItem("messages", JSON.stringify(messages));
+    localStorage.setItem("issues", JSON.stringify(issues));
+    renderRequests();
+}
+
+/* ---------- SAVE PROFESSORS ---------- */
+function saveProf(){
+  localStorage.setItem("professors", JSON.stringify(professors));
+  renderRequests();
+}
+
+/* ---------- LOGOUT ---------- */
+function addLogoutButton(parentDiv){
+  const existing = document.getElementById("logoutBtn");
+  if(existing) existing.remove();
+  const btn = document.createElement("button");
+  btn.id = "logoutBtn";
+  btn.innerText = "Logout";
+  btn.className = "bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl shadow-md transition absolute top-4 right-4";
+  btn.onclick = logout;
+  parentDiv.appendChild(btn);
+}
+
+function logout(){
+  localStorage.removeItem("currentUser");
+  hideAllScreens();
+  roleScreen.classList.remove("hidden");
+}
+
+/* ---------- PERSIST LOGIN ---------- */
+window.onload = function() {
+  const user = JSON.parse(localStorage.getItem("currentUser"));
+  if(!user) return;
+  hideAllScreens();
+  if(user.type==="student"){ currentStudent = { email:user.email, adm:user.adm }; studentDashboard.classList.remove("hidden"); renderStudentIssues(); addLogoutButton(studentDashboard);}
+  if(user.type==="professor"){ professorDashboard.classList.remove("hidden"); renderProfessorIssues(); addLogoutButton(professorDashboard);}
+  if(user.type==="admin"){ adminDashboard.classList.remove("hidden"); renderRequests(); addLogoutButton(adminDashboard);}
+};
+</script>
+
+</body>
+</html>
